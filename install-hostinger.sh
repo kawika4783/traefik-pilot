@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-COMPOSE_FILE="docker-compose.yml"
+COMPOSE_FILE="docker-compose.hostinger.yml"
 
 say() { printf '\n%s\n' "$*"; }
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }

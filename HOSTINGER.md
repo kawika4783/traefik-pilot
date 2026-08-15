@@ -43,7 +43,15 @@ Backups are written to `backups/` beside the project. Copy them to encrypted off
 
 ## Hostinger Docker Manager
 
-You can also import the repository's default `docker-compose.yml` as a Compose project in Docker Manager. Create `.env` from `.env.hostinger.example` first and replace every placeholder. The YAML preview must list exactly `traefik`, `db`, `docker-socket-proxy`, `api`, and `web`. If it shows Redis or declares an external network named `traefik`, the wrong Compose source is selected. Docker Manager can then show logs, restart or stop the project, and apply updates. The terminal installer remains the easier option because it generates secrets and performs preflight checks automatically.
+You can import the repository's default `docker-compose.yml` using **Compose from URL**. It pulls public prebuilt API and web images, so Docker Manager does not need the repository's Dockerfiles or an `.env` file. Set `PILOT_DOMAIN`, `ACME_EMAIL`, `POSTGRES_PASSWORD`, `JWT_SECRET`, and `ENCRYPTION_KEY` in Docker Manager before deployment. The YAML preview must list exactly `traefik`, `db`, `docker-socket-proxy`, `api`, and `web`. If it shows Redis or declares an external network named `traefik`, the wrong Compose source is selected.
+
+Use this public URL:
+
+```text
+https://raw.githubusercontent.com/kawika4783/traefik-pilot/refs/heads/main/docker-compose.yml
+```
+
+`JWT_SECRET` should contain at least 32 random characters. `ENCRYPTION_KEY` must contain exactly 64 hexadecimal characters. For example, generate them with `openssl rand -hex 48` and `openssl rand -hex 32`.
 
 ## Hosting other Compose projects
 

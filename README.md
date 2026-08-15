@@ -56,13 +56,13 @@ The browser never receives Docker credentials or touches the Docker socket. The 
 
 - Ubuntu 22.04/24.04 or comparable Linux host
 - Docker Engine 25+ with the Compose plugin
-- The default `docker-compose.yml` is self-contained for Hostinger and creates its own networks; no external `traefik` network is required.
+- The default `docker-compose.yml` is a standalone Docker Manager artifact that pulls public API/web images and creates its own networks; no repository build context, `.env` file, or external `traefik` network is required.
 - For a server where another Traefik already owns ports 80/443, use `docker-compose.existing-traefik.yml` and configure `TRAEFIK_NETWORK`.
 
 ## Install
 
 1. Clone/copy the repository and enter it.
-2. Run the Hostinger installer. It creates `.env`, strong secrets, and every required Docker network:
+2. Run the Hostinger installer. It uses `docker-compose.hostinger.yml` to build from source, creates `.env`, strong secrets, and every required Docker network:
 
    ```bash
    chmod +x install-hostinger.sh scripts/pilot.sh

@@ -2,19 +2,19 @@
 set -eu
 
 find_root() {
-  if [ -f "${PILOT_ROOT:-}/docker-compose.yml" ]; then printf '%s' "$PILOT_ROOT"; return; fi
-  if [ -f ./docker-compose.yml ]; then pwd; return; fi
+  if [ -f "${PILOT_ROOT:-}/docker-compose.hostinger.yml" ]; then printf '%s' "$PILOT_ROOT"; return; fi
+  if [ -f ./docker-compose.hostinger.yml ]; then pwd; return; fi
   if [ -f "$HOME/.config/traefik-pilot/root" ]; then
     configured_root=$(cat "$HOME/.config/traefik-pilot/root")
-    if [ -f "$configured_root/docker-compose.yml" ]; then printf '%s' "$configured_root"; return; fi
+    if [ -f "$configured_root/docker-compose.hostinger.yml" ]; then printf '%s' "$configured_root"; return; fi
   fi
   script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-  if [ -f "$script_dir/../docker-compose.yml" ]; then CDPATH= cd -- "$script_dir/.." && pwd; return; fi
+  if [ -f "$script_dir/../docker-compose.hostinger.yml" ]; then CDPATH= cd -- "$script_dir/.." && pwd; return; fi
   printf '%s' "$HOME/traefik-pilot"
 }
 
 ROOT=$(find_root)
-COMPOSE="docker compose -f $ROOT/docker-compose.yml --project-directory $ROOT"
+COMPOSE="docker compose -f $ROOT/docker-compose.hostinger.yml --project-directory $ROOT"
 command=${1:-help}
 
 case "$command" in

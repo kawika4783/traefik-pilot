@@ -1,7 +1,7 @@
 name: traefik-pilot
 
-# Default Hostinger VPS deployment. This stack owns ports 80/443 and creates
-# every required network automatically; no pre-existing `traefik` network is needed.
+# Hostinger Docker Manager deployment. It pulls public, prebuilt images and does
+# not require repository source files, Dockerfiles, an .env file, or an external network.
 services:
   traefik:
     image: traefik:v3.3
@@ -91,16 +91,23 @@ services:
     security_opt: [no-new-privileges:true]
 
   api:
-    build: {context: ., dockerfile: apps/api/Dockerfile}
+    image: ghcr.io/kawika4783/traefik-pilot-api:latest
     restart: unless-stopped
-    env_file: ["${PILOT_ENV_FILE:-.env}"]
     environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-pilot}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-traefik_pilot}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET to at least 32 random characters}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY to 64 hexadecimal characters}
+      ADMIN_ORIGIN: https://${PILOT_DOMAIN:?set PILOT_DOMAIN}
+      PILOT_DOMAIN: ${PILOT_DOMAIN}
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       TRAEFIK_API_URL: http://traefik:8080
       TRAEFIK_DYNAMIC_DIR: /data/traefik/dynamic
       BACKUP_DIR: /data/backups
       PORT: 4000
       HOSTING_PROVIDER: hostinger
+      DEMO_MODE: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - pilot-dynamic:/data/traefik/dynamic
       - pilot-backups:/data/backups
@@ -119,7 +126,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   web:
-    build: {context: ., dockerfile: apps/web/Dockerfile}
+    image: ghcr.io/kawika4783/traefik-pilot-web:latest
     restart: unless-stopped
     depends_on:
       api: {condition: service_healthy}

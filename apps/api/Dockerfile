@@ -1,9 +1,10 @@
 FROM node:22-alpine AS build
 RUN corepack enable
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/api/package.json apps/api/package.json
-RUN pnpm install --filter @pilot/api... --frozen-lockfile=false
+COPY apps/web/package.json apps/web/package.json
+RUN pnpm install --frozen-lockfile
 COPY apps/api apps/api
 RUN pnpm --filter @pilot/api build
 FROM node:22-alpine
