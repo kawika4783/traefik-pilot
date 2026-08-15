@@ -43,7 +43,7 @@ Backups are written to `backups/` beside the project. Copy them to encrypted off
 
 ## Hostinger Docker Manager
 
-You can import the repository's default `docker-compose.yml` using **Compose from URL**. It pulls public prebuilt API and web images, so Docker Manager does not need the repository's Dockerfiles or an `.env` file. Set `PILOT_DOMAIN`, `ACME_EMAIL`, `POSTGRES_PASSWORD`, `JWT_SECRET`, and `ENCRYPTION_KEY` in Docker Manager before deployment. The YAML preview must list exactly `traefik`, `db`, `docker-socket-proxy`, `api`, and `web`. If it shows Redis or declares an external network named `traefik`, the wrong Compose source is selected.
+You can import the repository's default `docker-compose.yml` using **Compose from URL**. It pulls public prebuilt API and web images, generates and persists strong secrets automatically, and needs no variables or `.env` file. The YAML preview must list `bootstrap`, `traefik`, `db`, `docker-socket-proxy`, `api`, and `web`. If it shows Redis or declares an external network named `traefik`, the wrong Compose source is selected.
 
 Use this public URL:
 
@@ -51,7 +51,7 @@ Use this public URL:
 https://raw.githubusercontent.com/kawika4783/traefik-pilot/refs/heads/main/docker-compose.yml
 ```
 
-`JWT_SECRET` should contain at least 32 random characters. `ENCRYPTION_KEY` must contain exactly 64 hexadecimal characters. For example, generate them with `openssl rand -hex 48` and `openssl rand -hex 32`.
+After deployment, open `http://YOUR_VPS_IP:8080` and create the first administrator. Allow TCP port 8080 temporarily in the Hostinger firewall. Once a domain and HTTPS route are configured, set `COOKIE_SECURE=true`, remove the public 8080 mapping, and close port 8080.
 
 ## Hosting other Compose projects
 

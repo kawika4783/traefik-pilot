@@ -1,8 +1,26 @@
 name: traefik-pilot
 
-# Hostinger Docker Manager deployment. It pulls public, prebuilt images and does
-# not require repository source files, Dockerfiles, an .env file, or an external network.
+# Zero-configuration Hostinger Docker Manager deployment. It pulls public images,
+# generates persistent secrets automatically, and opens the dashboard on port 8080.
 services:
+  bootstrap:
+    image: alpine:3.21
+    restart: "no"
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        umask 077
+        make_secret() { od -An -N"$$1" -tx1 /dev/urandom | tr -d ' \n'; }
+        [ -s /run/pilot-secrets/postgres_password ] || make_secret 24 > /run/pilot-secrets/postgres_password
+        [ -s /run/pilot-secrets/jwt_secret ] || make_secret 48 > /run/pilot-secrets/jwt_secret
+        [ -s /run/pilot-secrets/encryption_key ] || make_secret 32 > /run/pilot-secrets/encryption_key
+        chmod 600 /run/pilot-secrets/*
+    volumes:
+      - pilot-secrets:/run/pilot-secrets
+    networks: [pilot-internal]
+    security_opt: [no-new-privileges:true]
+
   traefik:
     image: traefik:v3.3
     restart: unless-stopped
@@ -18,7 +36,6 @@ services:
       - --providers.docker.network=pilot-edge
       - --providers.file.directory=/etc/traefik/dynamic
       - --providers.file.watch=true
-      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?set ACME_EMAIL}
       - --certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json
       - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
       - --accesslog=true
@@ -46,10 +63,14 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-traefik_pilot}
-      POSTGRES_USER: ${POSTGRES_USER:-pilot}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-    volumes: [pilot-db:/var/lib/postgresql/data]
+      POSTGRES_DB: traefik_pilot
+      POSTGRES_USER: pilot
+      POSTGRES_PASSWORD_FILE: /run/pilot-secrets/postgres_password
+    volumes:
+      - pilot-db:/var/lib/postgresql/data
+      - pilot-secrets:/run/pilot-secrets:ro
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
     networks: [pilot-internal]
     healthcheck:
       test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -93,13 +114,19 @@ services:
   api:
     image: ghcr.io/kawika4783/traefik-pilot-api:latest
     restart: unless-stopped
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        POSTGRES_PASSWORD="$$(cat /run/pilot-secrets/postgres_password)"
+        export DATABASE_URL="postgres://pilot:$${POSTGRES_PASSWORD}@db:5432/traefik_pilot"
+        export JWT_SECRET="$$(cat /run/pilot-secrets/jwt_secret)"
+        export ENCRYPTION_KEY="$$(cat /run/pilot-secrets/encryption_key)"
+        exec node dist/index.js
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://${POSTGRES_USER:-pilot}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-traefik_pilot}
-      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET to at least 32 random characters}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY to 64 hexadecimal characters}
-      ADMIN_ORIGIN: https://${PILOT_DOMAIN:?set PILOT_DOMAIN}
-      PILOT_DOMAIN: ${PILOT_DOMAIN}
+      COOKIE_SECURE: "false"
+      ADMIN_ORIGIN: http://localhost:8080
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       TRAEFIK_API_URL: http://traefik:8080
       TRAEFIK_DYNAMIC_DIR: /data/traefik/dynamic
@@ -111,7 +138,9 @@ services:
     volumes:
       - pilot-dynamic:/data/traefik/dynamic
       - pilot-backups:/data/backups
+      - pilot-secrets:/run/pilot-secrets:ro
     depends_on:
+      bootstrap: {condition: service_completed_successfully}
       db: {condition: service_healthy}
       docker-socket-proxy: {condition: service_started}
       traefik: {condition: service_healthy}
@@ -130,20 +159,9 @@ services:
     restart: unless-stopped
     depends_on:
       api: {condition: service_healthy}
+    ports:
+      - 8080:8080
     networks: [pilot-internal, pilot-edge]
-    labels:
-      traefik.enable: "true"
-      traefik.docker.network: pilot-edge
-      traefik.http.routers.pilot-web.rule: Host(`${PILOT_DOMAIN:?set PILOT_DOMAIN}`)
-      traefik.http.routers.pilot-web.entrypoints: web
-      traefik.http.routers.pilot-web.middlewares: pilot-https
-      traefik.http.routers.pilot-websecure.rule: Host(`${PILOT_DOMAIN:?set PILOT_DOMAIN}`)
-      traefik.http.routers.pilot-websecure.entrypoints: websecure
-      traefik.http.routers.pilot-websecure.tls: "true"
-      traefik.http.routers.pilot-websecure.tls.certresolver: letsencrypt
-      traefik.http.middlewares.pilot-https.redirectscheme.scheme: https
-      traefik.http.middlewares.pilot-https.redirectscheme.permanent: "true"
-      traefik.http.services.pilot.loadbalancer.server.port: "8080"
     healthcheck:
       test: [CMD, wget, -qO-, http://localhost:8080/healthz]
       interval: 15s
@@ -162,3 +180,4 @@ volumes:
   pilot-dynamic:
   pilot-acme:
   pilot-backups:
+  pilot-secrets:

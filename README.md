@@ -56,7 +56,7 @@ The browser never receives Docker credentials or touches the Docker socket. The 
 
 - Ubuntu 22.04/24.04 or comparable Linux host
 - Docker Engine 25+ with the Compose plugin
-- The default `docker-compose.yml` is a standalone Docker Manager artifact that pulls public API/web images and creates its own networks; no repository build context, `.env` file, or external `traefik` network is required.
+- The default `docker-compose.yml` is a zero-configuration Docker Manager artifact that pulls public images, generates persistent secrets, exposes first-run access on port 8080, and needs no build context, `.env`, variables, or external network.
 - For a server where another Traefik already owns ports 80/443, use `docker-compose.existing-traefik.yml` and configure `TRAEFIK_NETWORK`.
 
 ## Install
