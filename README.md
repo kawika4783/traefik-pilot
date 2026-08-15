@@ -56,36 +56,24 @@ The browser never receives Docker credentials or touches the Docker socket. The 
 
 - Ubuntu 22.04/24.04 or comparable Linux host
 - Docker Engine 25+ with the Compose plugin
-- For the standard Compose file: an existing Traefik 3.x instance, a shared file-provider directory, and the external network configured by `TRAEFIK_NETWORK` (defaults to `traefik-proxy`)
-- For `docker-compose.hostinger.yml`: no existing reverse proxy is needed; the included Traefik owns ports 80/443
+- The default `docker-compose.yml` is self-contained for Hostinger and creates its own networks; no external `traefik` network is required.
+- For a server where another Traefik already owns ports 80/443, use `docker-compose.existing-traefik.yml` and configure `TRAEFIK_NETWORK`.
 
 ## Install
 
 1. Clone/copy the repository and enter it.
-2. Create the public network if it does not exist:
+2. Run the Hostinger installer. It creates `.env`, strong secrets, and every required Docker network:
 
    ```bash
-   docker network create traefik-public
+   chmod +x install-hostinger.sh scripts/pilot.sh
+   ./install-hostinger.sh
    ```
 
-3. Copy `.env.example` to `.env`. Generate strong values:
-
-   ```bash
-   openssl rand -base64 48   # JWT_SECRET
-   openssl rand -hex 32      # ENCRYPTION_KEY
-   openssl rand -base64 32   # POSTGRES_PASSWORD
-   ```
-
-4. Set `PILOT_DOMAIN`, `TRAEFIK_API_URL`, `TRAEFIK_DYNAMIC_HOST_DIR`, and `BACKUP_HOST_DIR`. The dynamic host directory must also be mounted into Traefik's configured `providers.file.directory`.
-5. Start the stack:
-
-   ```bash
-   docker compose up -d --build
-   ```
-
-6. Open `https://$PILOT_DOMAIN`. The first-run endpoint permits exactly one administrator creation while the user table is empty. Complete Docker, Traefik, API, source discovery, backup, and health checks from Settings.
+3. Open the HTTPS address printed by the installer. The first-run endpoint permits exactly one administrator creation while the user table is empty. Complete Docker, Traefik, API, source discovery, backup, and health checks from Settings.
 
 ## Existing Traefik installations
+
+Use `docker-compose.existing-traefik.yml` for this advanced deployment mode. The default `docker-compose.yml` intentionally includes Traefik so a clean Hostinger VPS does not depend on a manually created external network.
 
 Pilot reads routers, services, and middleware from the Traefik API and reads Traefik labels from Docker. It does not overwrite discovered configuration. Managed routes are placed in `pilot-managed.yml` under the configured file-provider directory.
 

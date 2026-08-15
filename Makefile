@@ -12,7 +12,7 @@ up:
 down:
 	docker compose down
 hostinger-up:
-	docker compose -f docker-compose.hostinger.yml up -d --build
+	docker compose up -d --build
 hostinger-doctor:
 	./scripts/pilot.sh doctor
 hostinger-backup:

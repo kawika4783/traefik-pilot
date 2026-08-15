@@ -43,7 +43,7 @@ Backups are written to `backups/` beside the project. Copy them to encrypted off
 
 ## Hostinger Docker Manager
 
-You can also import `docker-compose.hostinger.yml` as a Compose project in Docker Manager. Create `.env` from `.env.hostinger.example` first and replace every placeholder. Docker Manager can then show logs, restart or stop the project, and apply updates. The terminal installer remains the easier option because it generates secrets and performs preflight checks automatically.
+You can also import the repository's default `docker-compose.yml` as a Compose project in Docker Manager. Create `.env` from `.env.hostinger.example` first and replace every placeholder. The YAML preview must list exactly `traefik`, `db`, `docker-socket-proxy`, `api`, and `web`. If it shows Redis or declares an external network named `traefik`, the wrong Compose source is selected. Docker Manager can then show logs, restart or stop the project, and apply updates. The terminal installer remains the easier option because it generates secrets and performs preflight checks automatically.
 
 ## Hosting other Compose projects
 
@@ -76,7 +76,11 @@ The Pilot route wizard is the safer day-to-day path because it validates the tar
 
 ## Existing Hostinger Traefik installation
 
-If another Traefik project already owns ports 80/443, use the standard `docker-compose.yml` instead. Set `TRAEFIK_NETWORK` to that project's shared external network (Hostinger commonly documents `traefik-proxy`), set the private `TRAEFIK_API_URL`, and mount the same file-provider directory into Pilot and Traefik. Never run two reverse proxies on the same public ports.
+If another Traefik project already owns ports 80/443, use `docker-compose.existing-traefik.yml` instead. Set `TRAEFIK_NETWORK` to that project's shared external network (Hostinger commonly documents `traefik-proxy`), set the private `TRAEFIK_API_URL`, and mount the same file-provider directory into Pilot and Traefik. Never run two reverse proxies on the same public ports.
+
+## Deployment error: external Traefik network not found
+
+The default Compose file does not declare an external network. If a build reports `network traefik declared as external, but could not be found`, Docker Manager loaded another project's Compose configuration or the advanced existing-Traefik file. Remove the failed project and redeploy from this repository's root `docker-compose.yml`. Do not create the missing network unless you intentionally operate a separate Traefik project that owns ports 80/443.
 
 ## Recovery
 
