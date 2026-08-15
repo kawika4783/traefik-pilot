@@ -1,0 +1,98 @@
+name: traefik-pilot
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-traefik_pilot}
+      POSTGRES_USER: ${POSTGRES_USER:-pilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes: [pilot-db:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [pilot-internal]
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      INFO: 1
+      NETWORKS: 1
+      SERVICES: 0
+      TASKS: 0
+      POST: 1
+      ALLOW_START: 1
+      ALLOW_STOP: 1
+      ALLOW_RESTARTS: 1
+      AUTH: 0
+      BUILD: 0
+      COMMIT: 0
+      CONFIGS: 0
+      EXEC: 0
+      IMAGES: 0
+      NODES: 0
+      PLUGINS: 0
+      SECRETS: 0
+      SWARM: 0
+      SYSTEM: 0
+      VOLUMES: 0
+    volumes: [/var/run/docker.sock:/var/run/docker.sock:ro]
+    networks: [pilot-internal]
+    read_only: true
+    security_opt: [no-new-privileges:true]
+  api:
+    build: {context: ., dockerfile: apps/api/Dockerfile}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      PORT: 4000
+    volumes:
+      - ${TRAEFIK_DYNAMIC_HOST_DIR:-./pilot-data/dynamic}:/data/traefik/dynamic
+      - ${BACKUP_HOST_DIR:-./pilot-data/backups}:/data/backups
+    depends_on:
+      db: {condition: service_healthy}
+      docker-socket-proxy: {condition: service_started}
+    networks: [pilot-internal]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:4000/api/system/health').then(r=>{if(!r.ok)process.exit(1)})"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+  web:
+    build: {context: ., dockerfile: apps/web/Dockerfile}
+    restart: unless-stopped
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [pilot-internal, traefik-public]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${TRAEFIK_NETWORK:-traefik-proxy}
+      traefik.http.routers.pilot.rule: Host(`${PILOT_DOMAIN:-traefik-admin.example.com}`)
+      traefik.http.routers.pilot.entrypoints: websecure
+      traefik.http.routers.pilot.tls: "true"
+      traefik.http.routers.pilot.tls.certresolver: ${CERT_RESOLVER:-letsencrypt}
+      traefik.http.services.pilot.loadbalancer.server.port: "8080"
+    healthcheck:
+      test: [CMD, wget, -qO-, http://localhost:8080/healthz]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    read_only: true
+    tmpfs: [/var/cache/nginx, /var/run]
+    security_opt: [no-new-privileges:true]
+networks:
+  pilot-internal: {internal: true}
+  traefik-public:
+    name: ${TRAEFIK_NETWORK:-traefik-proxy}
+    external: true
+volumes:
+  pilot-db:

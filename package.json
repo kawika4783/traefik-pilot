@@ -1,0 +1,1 @@
+{"name":"traefik-pilot","private":true,"version":"0.2.0","packageManager":"pnpm@11.19.0","scripts":{"dev":"concurrently -n api,web -c cyan,blue \"pnpm --filter @pilot/api dev\" \"pnpm --filter @pilot/web dev\"","build":"pnpm -r build","test":"pnpm -r test","lint":"pnpm -r lint","typecheck":"pnpm -r typecheck"},"devDependencies":{"concurrently":"^9.2.1"}}

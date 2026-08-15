@@ -1,0 +1,157 @@
+name: traefik-pilot
+
+# Self-contained Hostinger VPS deployment. This stack owns ports 80/443.
+# Use docker-compose.yml instead when Hostinger's Traefik template already owns them.
+services:
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    command:
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --ping=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --providers.docker=true
+      - --providers.docker.endpoint=tcp://docker-socket-proxy:2375
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=pilot-edge
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?set ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --accesslog=true
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - pilot-dynamic:/etc/traefik/dynamic
+      - pilot-acme:/etc/traefik/acme
+    depends_on:
+      docker-socket-proxy:
+        condition: service_started
+    networks: [pilot-internal, pilot-edge]
+    healthcheck:
+      test: [CMD, traefik, healthcheck, --ping]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-traefik_pilot}
+      POSTGRES_USER: ${POSTGRES_USER:-pilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes: [pilot-db:/var/lib/postgresql/data]
+    networks: [pilot-internal]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt: [no-new-privileges:true]
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      EVENTS: 1
+      INFO: 1
+      NETWORKS: 1
+      PING: 1
+      VERSION: 1
+      POST: 1
+      ALLOW_START: 1
+      ALLOW_STOP: 1
+      ALLOW_RESTARTS: 1
+      AUTH: 0
+      BUILD: 0
+      COMMIT: 0
+      CONFIGS: 0
+      EXEC: 0
+      IMAGES: 0
+      NODES: 0
+      PLUGINS: 0
+      SECRETS: 0
+      SWARM: 0
+      SYSTEM: 0
+      VOLUMES: 0
+    volumes: [/var/run/docker.sock:/var/run/docker.sock:ro]
+    networks: [pilot-internal]
+    read_only: true
+    tmpfs: [/run]
+    security_opt: [no-new-privileges:true]
+
+  api:
+    build: {context: ., dockerfile: apps/api/Dockerfile}
+    restart: unless-stopped
+    env_file: ["${PILOT_ENV_FILE:-.env}"]
+    environment:
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      TRAEFIK_API_URL: http://traefik:8080
+      TRAEFIK_DYNAMIC_DIR: /data/traefik/dynamic
+      BACKUP_DIR: /data/backups
+      PORT: 4000
+      HOSTING_PROVIDER: hostinger
+    volumes:
+      - pilot-dynamic:/data/traefik/dynamic
+      - pilot-backups:/data/backups
+    depends_on:
+      db: {condition: service_healthy}
+      docker-socket-proxy: {condition: service_started}
+      traefik: {condition: service_healthy}
+    networks: [pilot-internal]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:4000/api/system/health').then(r=>{if(!r.ok)process.exit(1)})"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+
+  web:
+    build: {context: ., dockerfile: apps/web/Dockerfile}
+    restart: unless-stopped
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [pilot-internal, pilot-edge]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: pilot-edge
+      traefik.http.routers.pilot-web.rule: Host(`${PILOT_DOMAIN:?set PILOT_DOMAIN}`)
+      traefik.http.routers.pilot-web.entrypoints: web
+      traefik.http.routers.pilot-web.middlewares: pilot-https
+      traefik.http.routers.pilot-websecure.rule: Host(`${PILOT_DOMAIN:?set PILOT_DOMAIN}`)
+      traefik.http.routers.pilot-websecure.entrypoints: websecure
+      traefik.http.routers.pilot-websecure.tls: "true"
+      traefik.http.routers.pilot-websecure.tls.certresolver: letsencrypt
+      traefik.http.middlewares.pilot-https.redirectscheme.scheme: https
+      traefik.http.middlewares.pilot-https.redirectscheme.permanent: "true"
+      traefik.http.services.pilot.loadbalancer.server.port: "8080"
+    healthcheck:
+      test: [CMD, wget, -qO-, http://localhost:8080/healthz]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    read_only: true
+    tmpfs: [/var/cache/nginx, /var/run]
+    security_opt: [no-new-privileges:true]
+
+networks:
+  pilot-internal: {internal: true}
+  pilot-edge: {name: pilot-edge}
+
+volumes:
+  pilot-db:
+  pilot-dynamic:
+  pilot-acme:
+  pilot-backups:

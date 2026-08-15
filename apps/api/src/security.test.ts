@@ -1,0 +1,2 @@
+import{describe,expect,it,vi}from'vitest';import{csrf,encrypt}from'./security.js';
+describe('security',()=>{it('encrypts secrets without revealing plaintext',()=>{const value=encrypt('dns-token-super-secret');expect(value).not.toContain('dns-token');expect(value.split('.')).toHaveLength(3)});it('rejects mismatched CSRF tokens',()=>{const req:any={method:'POST',cookies:{pilot_csrf:'one'},header:()=> 'two'};const status=vi.fn(()=>({json:vi.fn()}));csrf(req,{status} as any,vi.fn());expect(status).toHaveBeenCalledWith(403)})});

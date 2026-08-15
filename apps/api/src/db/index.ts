@@ -1,0 +1,5 @@
+import pg from 'pg'; import fs from 'node:fs/promises'; import path from 'node:path'; import { config } from '../config.js';
+export const pool = new pg.Pool({connectionString:config.DATABASE_URL,max:10,connectionTimeoutMillis:3000});
+export const query = <T extends pg.QueryResultRow>(text:string, values:unknown[]=[]):Promise<pg.QueryResult<T>> => pool.query<T>(text,values);
+export async function migrate(){ const dir=path.join(path.dirname(new URL(import.meta.url).pathname),'migrations'); for(const f of (await fs.readdir(dir)).filter(x=>x.endsWith('.sql')).sort()) await pool.query(await fs.readFile(path.join(dir,f),'utf8')); }
+export async function audit(actor:{id?:string,email?:string,ip?:string},action:string,target:string,previous:unknown,next:unknown,result='success'){ await query('INSERT INTO audit_events(actor_id,actor_email,ip,action,target,previous_value,new_value,result) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[actor.id||null,actor.email||null,actor.ip||null,action,target,previous?JSON.stringify(previous):null,next?JSON.stringify(next):null,result]); }

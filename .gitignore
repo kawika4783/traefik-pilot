@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+coverage
+playwright-report
+test-results
+*.log
+.pilot-data
+.config-types
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts

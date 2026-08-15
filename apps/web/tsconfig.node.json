@@ -1,0 +1,1 @@
+{"compilerOptions":{"composite":true,"skipLibCheck":true,"module":"ESNext","moduleResolution":"Bundler","emitDeclarationOnly":true,"outDir":".config-types"},"include":["vite.config.ts"]}
