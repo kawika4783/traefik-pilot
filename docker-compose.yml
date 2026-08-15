@@ -15,15 +15,17 @@ services:
         [ -s /run/pilot-secrets/postgres_password ] || make_secret 24 > /run/pilot-secrets/postgres_password
         [ -s /run/pilot-secrets/jwt_secret ] || make_secret 48 > /run/pilot-secrets/jwt_secret
         [ -s /run/pilot-secrets/encryption_key ] || make_secret 32 > /run/pilot-secrets/encryption_key
-        chmod 600 /run/pilot-secrets/*
+        chmod 644 /run/pilot-secrets/*
     volumes:
       - pilot-secrets:/run/pilot-secrets
     networks: [pilot-internal]
     security_opt: [no-new-privileges:true]
 
   traefik:
-    image: traefik:v3.3
+    image: traefik:v3.7.1
     restart: unless-stopped
+    environment:
+      DOCKER_API_VERSION: "1.44"
     command:
       - --api.dashboard=true
       - --api.insecure=true
@@ -107,7 +109,6 @@ services:
       VOLUMES: 0
     volumes: [/var/run/docker.sock:/var/run/docker.sock:ro]
     networks: [pilot-internal]
-    read_only: true
     tmpfs: [/run]
     security_opt: [no-new-privileges:true]
 
@@ -163,7 +164,7 @@ services:
       - 8080:8080
     networks: [pilot-internal, pilot-edge]
     healthcheck:
-      test: [CMD, wget, -qO-, http://localhost:8080/healthz]
+      test: [CMD, wget, -qO-, http://127.0.0.1:8080/healthz]
       interval: 15s
       timeout: 5s
       retries: 10

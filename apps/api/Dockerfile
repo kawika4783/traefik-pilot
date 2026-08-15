@@ -9,11 +9,11 @@ COPY apps/api apps/api
 RUN pnpm --filter @pilot/api build
 FROM node:22-alpine
 RUN addgroup -S pilot && adduser -S pilot -G pilot
-WORKDIR /app
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
-COPY --from=build /app/apps/api/dist ./dist
-COPY --from=build /app/apps/api/src/db/migrations ./dist/db/migrations
+WORKDIR /app/apps/api
+COPY --from=build /app/node_modules /app/node_modules
+COPY --from=build /app/apps/api/node_modules /app/apps/api/node_modules
+COPY --from=build /app/apps/api/dist /app/apps/api/dist
+COPY --from=build /app/apps/api/src/db/migrations /app/apps/api/dist/db/migrations
 USER pilot
 EXPOSE 4000
 CMD ["node","dist/index.js"]
